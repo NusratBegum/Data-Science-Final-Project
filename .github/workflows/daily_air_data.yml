@@ -1,10 +1,8 @@
 name: Collect Air Quality Data Daily
 
-# This workflow will run every day at midnight UTC.
 on:
   schedule:
     - cron: '0 0 * * *'
-  # Allows manual triggering from the Actions tab:
   workflow_dispatch:
 
 jobs:
@@ -12,31 +10,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Check out your repository code.
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Set up Python.
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
 
-      # Install required Python packages.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install requests pandas
 
-      # Run the script that fetches air quality data.
       - name: Run fetch_airdata.py
         run: python fetch_airdata.py
 
-      # (Optional) Commit and push the updated CSV back to the repository.
-      # This step uses a community action to handle commits automatically.
       - name: Commit changes
         uses: EndBug/add-and-commit@v9
         with:
           add: 'air_data.csv'
           message: 'Daily update of air quality data'
-          branch: main
+          github_token: ${{ secrets.GH_PAT }}
