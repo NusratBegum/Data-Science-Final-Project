@@ -13,7 +13,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Ensures full history for proper git pull
+          fetch-depth: 0  # Fetch full history so pull can integrate remote changes
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -28,10 +28,12 @@ jobs:
       - name: Run fetch_airdata.py
         run: python fetch_airdata.py
 
+      - name: Pull remote changes
+        run: git pull origin main --rebase
+
       - name: Commit changes
         uses: EndBug/add-and-commit@v9
         with:
           add: 'air_data.csv'
           message: 'Daily update of air quality data'
           github_token: ${{ secrets.GH_PAT }}
-          pull: true  # Pulls remote changes before pushing
