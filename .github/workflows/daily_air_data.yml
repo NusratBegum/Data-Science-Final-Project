@@ -32,3 +32,4 @@ jobs:
           add: 'air_data.csv'
           message: 'Daily update of air quality data'
           github_token: ${{ secrets.GH_PAT }}
+          pull: true
