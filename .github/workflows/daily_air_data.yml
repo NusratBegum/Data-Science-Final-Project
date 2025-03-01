@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Ensures full history for proper git pull
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -32,4 +34,4 @@ jobs:
           add: 'air_data.csv'
           message: 'Daily update of air quality data'
           github_token: ${{ secrets.GH_PAT }}
-          pull: true
+          pull: true  # Pulls remote changes before pushing
