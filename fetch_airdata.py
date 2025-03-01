@@ -9,7 +9,8 @@ from datetime import datetime
 # https://aqicn.org/historical/#city:bangkok
 
 # Replace with your API key
-API_KEY = "6dc81476dc289c876d8c61441f03a2b85332521a"
+# Retrieve API key from environment variable
+API_KEY = os.getenv("AQICN_API_KEY")
 
 # List of cities
 cities = ["Bangkok", "Beijing", "Los Angeles"]
