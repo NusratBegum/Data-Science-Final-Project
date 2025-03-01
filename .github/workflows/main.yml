@@ -36,6 +36,7 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git pull origin main --rebase  # Pull remote changes and rebase local changes on top
           git add air_data.csv  # Only add the intended file
           if git diff-index --quiet HEAD; then
             echo "No changes detected, skipping commit."
