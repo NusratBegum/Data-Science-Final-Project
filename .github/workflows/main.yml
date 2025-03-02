@@ -15,6 +15,15 @@ jobs:
         with:
           fetch-depth: 0  # Full history for Git operations
 
+      - name: Check working directory state
+        run: |
+          echo "Listing files:"
+          ls -la
+          echo "Git status:"
+          git status
+          echo "Git diff (if any changes):"
+          git diff || echo "No differences found"
+
       - name: Pull latest changes from main
         env:
           GH_PAT: ${{ secrets.GH_PAT }}  # Use PAT for authentication
