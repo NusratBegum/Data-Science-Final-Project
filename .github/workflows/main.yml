@@ -15,6 +15,24 @@ jobs:
         with:
           fetch-depth: 0  # Full history for Git operations
 
+      - name: Diagnose working directory after checkout
+        run: |
+          echo "Files in directory:"
+          ls -la
+          echo "Git status after checkout:"
+          git status
+          echo "Git diff (if any changes):"
+          git diff || echo "No differences found"
+
+      - name: Pull latest changes from main
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}  # Use PAT for authentication
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git pull https://x-access-token:${GH_PAT}@github.com/NusratBegum/ds-project.git main --rebase
+          echo "Pulled latest changes from main"
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -31,14 +49,12 @@ jobs:
         run: |
           python fetch_airdata.py || exit 1  # Run script and fail if it errors
           echo "Data fetch completed"
+          git status  # Show changes after script
 
       - name: Commit and push changes
         env:
           GH_PAT: ${{ secrets.GH_PAT }}  # Personal Access Token for authentication
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git pull https://x-access-token:${GH_PAT}@github.com/NusratBegum/ds-project.git main --rebase
           git add air_data.csv
           if git diff-index --quiet HEAD; then
             echo "No changes detected, skipping commit."
