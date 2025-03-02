@@ -15,6 +15,14 @@ jobs:
         with:
           fetch-depth: 0  # Full history for Git operations
 
+      - name: Pull latest changes from main
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}  # Use PAT for authentication
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git pull origin main --rebase  # Pull remote changes first
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -34,9 +42,6 @@ jobs:
         env:
           GH_PAT: ${{ secrets.GH_PAT }}  # Personal Access Token for authentication
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git pull origin main --rebase  # Pull remote changes and rebase local changes on top
           git add air_data.csv  # Only add the intended file
           if git diff-index --quiet HEAD; then
             echo "No changes detected, skipping commit."
