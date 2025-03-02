@@ -15,11 +15,11 @@ jobs:
         with:
           fetch-depth: 0  # Full history for Git operations
 
-      - name: Check working directory state
+      - name: Diagnose working directory after checkout
         run: |
-          echo "Listing files:"
+          echo "Files in directory:"
           ls -la
-          echo "Git status:"
+          echo "Git status after checkout:"
           git status
           echo "Git diff (if any changes):"
           git diff || echo "No differences found"
@@ -46,7 +46,10 @@ jobs:
       - name: Run fetch_airdata.py
         env:
           AQICN_API_KEY: ${{ secrets.AQICN_API_KEY }}  # Pass API key as env variable
-        run: python fetch_airdata.py || exit 1  # Fail if script fails
+        run: |
+          python fetch_airdata.py || exit 1  # Fail if script fails
+          echo "Script executed, checking changes:"
+          git status
 
       - name: Commit and push changes
         env:
