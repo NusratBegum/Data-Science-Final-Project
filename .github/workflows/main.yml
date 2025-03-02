@@ -6,7 +6,7 @@ on:
   workflow_dispatch:     # Allows manual triggering
 
 jobs:
-  fetch-data:
+  fetch-and-update:
     runs-on: ubuntu-latest
 
     steps:
@@ -15,51 +15,39 @@ jobs:
         with:
           fetch-depth: 0  # Full history for Git operations
 
-      - name: Diagnose working directory after checkout
-        run: |
-          echo "Files in directory:"
-          ls -la
-          echo "Git status after checkout:"
-          git status
-          echo "Git diff (if any changes):"
-          git diff || echo "No differences found"
-
-      - name: Pull latest changes from main
-        env:
-          GH_PAT: ${{ secrets.GH_PAT }}  # Use PAT for authentication
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git pull https://x-access-token:${GH_PAT}@github.com/NusratBegum/ds-project.git main --rebase
-          echo "Pulled latest changes from main"
-
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'  # Specific version for consistency
+          python-version: '3.11'  # Consistent Python version
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install requests pandas
 
-      - name: Run fetch_airdata.py
+      - name: Fetch air quality data
         env:
-          AQICN_API_KEY: ${{ secrets.AQICN_API_KEY }}  # Pass API key as env variable
+          AQICN_API_KEY: ${{ secrets.AQICN_API_KEY }}  # Pass API key from secrets
         run: |
-          python fetch_airdata.py || exit 1  # Fail if script fails
-          echo "Script executed, checking changes:"
-          git status
+          python fetch_airdata.py || exit 1  # Run script and fail if it errors
+          echo "Data fetch completed"
 
       - name: Commit and push changes
         env:
           GH_PAT: ${{ secrets.GH_PAT }}  # Personal Access Token for authentication
         run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git pull https://x-access-token:${GH_PAT}@github.com/NusratBegum/ds-project.git main --rebase
           git add air_data.csv
           if git diff-index --quiet HEAD; then
             echo "No changes detected, skipping commit."
           else
-            git commit -m "Daily update of air_data.csv"
+            git commit -m "Daily update of air_data.csv - $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
             git push https://x-access-token:${GH_PAT}@github.com/NusratBegum/ds-project.git HEAD:main
-            echo "Pushed changes to main"
+            echo "Changes committed and pushed"
           fi
+
+      - name: Read and display air data (optional)
+        run: |
+          python read_airdata.py || echo "Failed to read air_data.csv"
