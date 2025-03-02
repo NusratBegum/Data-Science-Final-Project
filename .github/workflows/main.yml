@@ -21,7 +21,8 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git pull origin main --rebase  # Pull remote changes first
+          git pull https://x-access-token:${GH_PAT}@github.com/NusratBegum/ds-project.git main --rebase
+          echo "Pulled latest changes from main"
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -36,16 +37,17 @@ jobs:
       - name: Run fetch_airdata.py
         env:
           AQICN_API_KEY: ${{ secrets.AQICN_API_KEY }}  # Pass API key as env variable
-        run: python fetch_airdata.py
+        run: python fetch_airdata.py || exit 1  # Fail if script fails
 
       - name: Commit and push changes
         env:
           GH_PAT: ${{ secrets.GH_PAT }}  # Personal Access Token for authentication
         run: |
-          git add air_data.csv  # Only add the intended file
+          git add air_data.csv
           if git diff-index --quiet HEAD; then
             echo "No changes detected, skipping commit."
           else
             git commit -m "Daily update of air_data.csv"
             git push https://x-access-token:${GH_PAT}@github.com/NusratBegum/ds-project.git HEAD:main
+            echo "Pushed changes to main"
           fi
