@@ -1,0 +1,4 @@
+# ignore .cache.*
+# ignore .env.*
+.cache.*
+.env.*
