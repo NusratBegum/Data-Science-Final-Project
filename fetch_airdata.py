@@ -60,4 +60,4 @@ if __name__ == "__main__":
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         if pm25_data:
             save_to_csv([timestamp, city, aqi, pm25, pm25_data], CSV_FILE)
-            print(f"Data saved for {city}: {pm25_data}")
+            print(f"Data saved for {city}: AQI={aqi}, PM2.5={pm25}")
