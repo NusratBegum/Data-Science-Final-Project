@@ -1,0 +1,26 @@
+# Air Quality Data Analysis - Requirements
+# Data Science Final Project - Group 3
+
+# Core data manipulation and analysis
+pandas>=1.5.0
+numpy>=1.23.0
+
+# Data visualization
+matplotlib>=3.6.0
+seaborn>=0.12.0
+
+# Statistical analysis
+scipy>=1.9.0
+
+# Machine learning
+scikit-learn>=1.2.0
+
+# HTTP requests for API calls
+requests>=2.28.0
+
+# Jupyter notebook support
+jupyter>=1.0.0
+ipykernel>=6.15.0
+
+# Additional utilities
+python-dateutil>=2.8.0
