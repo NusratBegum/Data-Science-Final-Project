@@ -1,140 +1,81 @@
-# Bangkok Air Pollution Analysis
-**Data Science Essentials - Final Project - Group 3**
+# Bangkok Air Quality Tracker
 
-![Bangkok Air Pollution](bangkok_air_pollution_title_slide.png)
+**Live dashboard:** _link added after the first Vercel deploy_
 
-## Authors
-- **Student ID: 6736748** (Liam)
-- **Student ID: 6638009** (Nusrat)
+A small data pipeline and dashboard for PM2.5 in Bangkok, with Beijing and Los Angeles for comparison. A scheduled GitHub Actions job has pulled one reading per city from the AQICN API each day since **1 March 2025** and committed it to this repository: 570 daily readings per city so far, with one 35-day gap (15 Jan – 18 Feb 2026) when the job did not run. A static dashboard is rebuilt from that file and deployed on every push.
 
-## Project Overview
-This project investigates the impact of meteorological conditions on PM2.5 levels in Bangkok, Thailand. Through comprehensive data collection and statistical analysis, we aim to identify high-risk air quality scenarios and inform policy and mitigation strategies for better public health outcomes.
+It started as the final project for *Data Science Essentials* at Mahidol University (MUICT), built by a team of two, and has kept collecting data since.
 
-### Problem Statement
-Investigate the impact of meteorological conditions (low wind speed, high humidity, and rainfall) on PM2.5 levels in Bangkok to identify high-risk air quality scenarios and inform policy and mitigation strategies.
+![Dashboard screenshot](docs/dashboard.png)
 
-## Hypotheses
-1. **Hypothesis 1**: PM2.5 levels are significantly higher (>100 µg/m³) on days with low wind speed (<64 km/h) and high humidity (>70%) compared to other days.
-2. **Hypothesis 2**: There is a significant difference in PM2.5 levels on rainy days in Bangkok compared to non-rainy days.
+## What it does
 
-## Data Sources
-- **AQI Data**: Air Quality Index from [AQICN API](https://aqicn.org/api/)
-- **WAQI Data**: World Air Quality Index historical data
-- **Open-Meteo Weather Data**: Meteorological data including wind speed, humidity, and precipitation
-
-## Stakeholders
-- **Pollution Control Department (PCD)**: Evidence-based insights for air quality alerts and emission controls
-- **Bangkok Metropolitan Administration (BMA)**: Data for urban planning and public health measures
-- **Thai Meteorological Department**: Weather-pollution interaction insights for enhanced forecasting
-
-## Project Structure
 ```
-.
-├── README.md                              # Project documentation (this file)
-├── main.ipynb                             # Main Jupyter notebook with complete analysis
-├── fetch_airdata.py                       # Script to fetch air quality data from AQICN API
-├── read_airdata.py                        # Script to read and display collected data
-├── air_data.csv                           # Collected air quality data
-├── bangkok_air_pollution_title_slide.png  # Title image
-└── SECURITY.md                            # Security documentation
+GitHub Actions (daily cron, 00:00 UTC)
+  └─ fetch_airdata.py          → AQICN API → appends 3 rows to air_data.csv
+  └─ scripts/build_dashboard.py → air_data.csv → dashboard/data.json
+  └─ git commit + push         → Vercel redeploys dashboard/
 ```
 
-## Setup and Installation
+- **Collection:** `fetch_airdata.py` calls the AQICN city feed for each city and appends the AQI, the PM2.5 sub-index and the raw JSON response (temperature, humidity, wind, forecasts) to `air_data.csv`. The API key is read from the `AQICN_API_KEY` environment variable / repository secret.
+- **Transform:** `scripts/build_dashboard.py` parses the CSV (stdlib only), keeps one reading per city per day, and writes a compact `dashboard/data.json`.
+- **Dashboard:** `dashboard/index.html` is a static page with Chart.js: 7-calendar-day average lines per city (gaps shown as breaks) with daily values on hover, a daily table view, Bangkok monthly averages, days per US EPA AQI category, a time-range filter, a table view, and light/dark themes.
+- **Analysis:** `main.ipynb` holds the original course analysis (see below).
 
-### Prerequisites
-- Python 3.7 or higher
-- pip (Python package installer)
+## Data notes
 
-### Required Libraries
-Install the required dependencies using:
+- Values are the **PM2.5 AQI sub-index (US EPA scale)** from the AQICN station feed, not raw µg/m³.
+- Collection gap: no data from 15 Jan to 18 Feb 2026. The dashboard shows it as a break in the lines.
+- Each point is one snapshot per day, taken in the Bangkok morning (the job is scheduled for 07:00 local time and GitHub may start it later), not a 24-hour mean.
+- Stations: Bangkok (city feed), Beijing (city feed), Los Angeles (North Main Street).
+
+## Course analysis and results
+
+The notebook tested two hypotheses on Bangkok data from March–April 2025 (47 days, joined with Open-Meteo weather):
+
+| Hypothesis | Test | Result |
+|---|---|---|
+| H1: PM2.5 is higher on low-wind (< 64 km/h) and high-humidity (> 70%) days | One-tailed Welch t-test; Mann–Whitney U | **Not supported.** Mean 79.7 on those days (n = 34) vs 109.4 on other days (n = 13); p = 0.98 (t-test), p = 0.99 (Mann–Whitney). |
+| H2: PM2.5 differs between rainy and dry days | Two-tailed Welch t-test; Mann–Whitney U | **Not significant.** Mean 81.9 on rainy days (n = 28) vs 96.8 on dry days (n = 19); p = 0.14 (t-test), p = 0.29 (Mann–Whitney). |
+
+Linear regressions on the same features had negative mean 5-fold cross-validated R² (−1.57 and −1.87), so weather alone did not predict PM2.5 in that window. The small sample (47 days, one season) is the main limitation. The daily collection that continues in this repo, now 570 days, is the dataset a follow-up analysis would use.
+
+## Run it locally
+
 ```bash
 pip install -r requirements.txt
-```
 
-The main dependencies include:
-- `pandas` - Data manipulation and analysis
-- `numpy` - Numerical computing
-- `matplotlib` - Data visualization
-- `seaborn` - Statistical data visualization
-- `scipy` - Scientific computing and statistical tests
-- `scikit-learn` - Machine learning library
-- `requests` - HTTP library for API calls
-
-### API Key Setup
-To collect air quality data, you need an API key from AQICN:
-1. Register at [AQICN Data Platform](https://aqicn.org/data-platform/register/)
-2. Set the API key as an environment variable:
-   ```bash
-   export AQICN_API_KEY="your_api_key_here"
-   ```
-
-## Usage
-
-### 1. Data Collection
-Fetch air quality data from the AQICN API:
-```bash
+# collect today's readings (needs a free key from https://aqicn.org/data-platform/token/)
+export AQICN_API_KEY="your_key"
 python fetch_airdata.py
-```
-This script collects AQI and PM2.5 data for Bangkok, Beijing, and Los Angeles, and saves it to `air_data.csv`.
 
-### 2. Read Collected Data
-View the collected data:
-```bash
-python read_airdata.py
+# rebuild the dashboard data and open it
+python scripts/build_dashboard.py
+python -m http.server -d dashboard 8000   # then visit http://localhost:8000
 ```
 
-### 3. Run Analysis
-Open and run the Jupyter notebook to see the complete analysis:
-```bash
-jupyter notebook main.ipynb
+## Project structure
+
+```
+.
+├── .github/workflows/main.yml   # daily collection + dashboard data rebuild
+├── fetch_airdata.py             # AQICN API client → air_data.csv
+├── read_airdata.py              # quick look at the collected CSV
+├── scripts/build_dashboard.py   # air_data.csv → dashboard/data.json
+├── dashboard/                   # static dashboard served by Vercel
+│   ├── index.html
+│   └── data.json
+├── air_data.csv                 # collected data (appended daily)
+├── main.ipynb                   # course analysis
+├── docs/dashboard.png
+└── vercel.json
 ```
 
-## Methodology
+## Authors
 
-### Data Collection and Preparation
-- Daily automated data collection using the AQICN API
-- Integration of weather data from Open-Meteo
-- Data cleaning and handling of missing values
-- Feature engineering for hypothesis testing
-
-### Analysis Techniques
-1. **Descriptive Statistics**: Summary statistics and data distribution analysis
-2. **Data Visualization**: Time series plots, correlation heatmaps, and distribution plots
-3. **Statistical Testing**: 
-   - One-tailed t-test for Hypothesis 1
-   - Mann-Whitney U test for Hypothesis 2
-4. **Machine Learning**: Linear regression models with cross-validation
-
-## Key Findings
-
-### Hypothesis 1 Results
-Testing whether PM2.5 levels are significantly higher on days with low wind speed and high humidity:
-- Statistical significance achieved (p-value < 0.05)
-- PM2.5 levels exceeding 100 µg/m³ observed under specified conditions
-
-### Hypothesis 2 Results
-Testing the difference in PM2.5 levels between rainy and non-rainy days:
-- Significant difference identified using Mann-Whitney U test
-- Actionable insights for air quality management
-
-## Success Metrics
-- **Statistical Significance**: p-value < 0.05 for both hypothesis tests
-- **Practical Significance**: PM2.5 exceeding health thresholds (100 µg/m³)
-- **Model Performance**: R² scores and cross-validation metrics for predictive models
-
-## Recommendations
-Based on our analysis, we provide evidence-based recommendations for:
-- Air quality alert systems during high-risk weather conditions
-- Traffic management strategies during poor air quality episodes
-- Public health advisories for vulnerable populations
-
-## Contributing
-This is an academic project for the Data Science Essentials course. For questions or collaboration, please contact the authors through their student IDs.
-
-## License
-This project is for educational purposes as part of the Data Science Essentials course at Mahidol University.
+- Nusrat Begum ([GitHub](https://github.com/NusratBegum) · [nusratbegum.dev](https://nusratbegum.dev)) and Liam: course project authors
+- Nusrat Begum maintains the daily collection and the dashboard
 
 ## Acknowledgments
-- **Instructor**: Data Science Essentials course faculty
-- **Data Providers**: AQICN, World Air Quality Index Project, Open-Meteo
-- **Institution**: Mahidol University ICT
+
+Data from the [World Air Quality Index Project](https://aqicn.org/) and [Open-Meteo](https://open-meteo.com/). Course: Data Science Essentials, Faculty of ICT, Mahidol University.

@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bangkok Air Quality Tracker</title>
+<meta name="description" content="Daily PM2.5 readings for Bangkok, Beijing and Los Angeles, collected automatically by a GitHub Actions job since March 2025.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%232a78d6'/%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light;
+    --surface-0: #f4f3f0;
+    --surface-1: #fcfcfb;
+    --border: #e2e0da;
+    --grid: #ebe9e4;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #6f6e69;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --seq-1: #86b6ef; --seq-2: #5598e7; --seq-3: #2a78d6; --seq-4: #1c5cab; --seq-5: #104281; --seq-6: #0d366b;
+    --ref: #8a8984;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface-0: #111110;
+      --surface-1: #1a1a19;
+      --border: #2e2e2c;
+      --grid: #262624;
+      --text-primary: #f0efec;
+      --text-secondary: #c3c2b7;
+      --text-muted: #9a998f;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --seq-1: #184f95; --seq-2: #1c5cab; --seq-3: #256abf; --seq-4: #3987e5; --seq-5: #6da7ec; --seq-6: #9ec5f4;
+      --ref: #77766f;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-0: #111110;
+    --surface-1: #1a1a19;
+    --border: #2e2e2c;
+    --grid: #262624;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --text-muted: #9a998f;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --seq-1: #184f95; --seq-2: #1c5cab; --seq-3: #256abf; --seq-4: #3987e5; --seq-5: #6da7ec; --seq-6: #9ec5f4;
+    --ref: #77766f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--surface-0);
+    color: var(--text-primary);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 32px 16px 48px; }
+  header h1 { margin: 0 0 4px; font-size: clamp(1.5rem, 3vw, 2rem); letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--text-secondary); max-width: 68ch; }
+  .meta { margin-top: 8px; font-size: 13px; color: var(--text-muted); }
+  .meta a { color: inherit; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 24px 0 16px; }
+  .controls span { font-size: 13px; color: var(--text-muted); margin-right: 4px; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface-1); }
+  .seg button {
+    font: inherit; font-size: 13px; padding: 6px 12px; border: 0; background: transparent;
+    color: var(--text-secondary); cursor: pointer;
+  }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button[aria-pressed="true"] { background: var(--text-primary); color: var(--surface-1); }
+  .seg button:focus-visible { outline: 2px solid var(--series-1); outline-offset: -2px; }
+  .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .tile, .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; }
+  .tile { padding: 16px; }
+  .tile .label { font-size: 13px; color: var(--text-secondary); }
+  .tile .value { font-size: 28px; font-weight: 650; letter-spacing: -0.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .tile .sub { font-size: 12px; color: var(--text-muted); }
+  .card { padding: 16px 16px 12px; margin-top: 12px; }
+  .card h2 { margin: 0; font-size: 16px; }
+  .card .desc { margin: 2px 0 12px; font-size: 13px; color: var(--text-secondary); }
+  .grid2 { display: grid; grid-template-columns: 3fr 2fr; gap: 12px; }
+  .grid2 .card { margin-top: 12px; }
+  .chart { position: relative; height: 340px; }
+  .chart.sm { height: 280px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
+  .legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; font-size: 14px; color: var(--text-secondary); }
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-secondary); font-weight: 600; }
+  .tablewrap.daily { max-height: 420px; overflow-y: auto; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .notes { margin-top: 24px; font-size: 13px; color: var(--text-secondary); }
+  .notes h2 { font-size: 15px; color: var(--text-primary); margin: 0 0 6px; }
+  .notes ul { margin: 0; padding-left: 18px; }
+  footer { margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+  footer a { color: var(--text-secondary); }
+  .error { padding: 16px; color: var(--text-secondary); }
+  @media (max-width: 860px) {
+    .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid2 { grid-template-columns: 1fr; }
+    .chart { height: 280px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Bangkok Air Quality Tracker</h1>
+    <p>PM2.5 readings for Bangkok, with Beijing and Los Angeles for comparison. A scheduled GitHub Actions job pulls one reading per city from the AQICN API each day and commits it to the repository; this page is rebuilt from that file.</p>
+    <div class="meta" id="meta">Loading data…</div>
+  </header>
+
+  <div class="controls" role="group" aria-label="Time range">
+    <span>Range</span>
+    <div class="seg" id="range">
+      <button type="button" data-days="90" aria-pressed="false">90 days</button>
+      <button type="button" data-days="365" aria-pressed="false">12 months</button>
+      <button type="button" data-days="0" aria-pressed="true">All</button>
+    </div>
+  </div>
+
+  <section class="tiles" aria-label="Bangkok summary">
+    <div class="tile"><div class="label">Days collected</div><div class="value" id="t-days">–</div><div class="sub" id="t-days-sub"></div></div>
+    <div class="tile"><div class="label">Latest Bangkok reading</div><div class="value" id="t-latest">–</div><div class="sub" id="t-latest-sub"></div></div>
+    <div class="tile"><div class="label">Bangkok average, selected range</div><div class="value" id="t-avg">–</div><div class="sub">PM2.5 AQI</div></div>
+    <div class="tile"><div class="label">Bangkok days above 100</div><div class="value" id="t-over">–</div><div class="sub" id="t-over-sub"></div></div>
+  </section>
+
+  <section class="card">
+    <h2>PM2.5 AQI by city, 7-day average</h2>
+    <p class="desc">Hover for the daily reading; breaks are days with no collection. Dashed lines mark AQI 100 (unhealthy for sensitive groups) and 150 (unhealthy).</p>
+    <div class="legend" id="legend"></div>
+    <div class="chart"><canvas id="lineChart" role="img" aria-label="Line chart of 7-day average PM2.5 AQI for Bangkok, Beijing and Los Angeles"></canvas></div>
+  </section>
+
+  <div class="grid2">
+    <section class="card">
+      <h2>Bangkok monthly average</h2>
+      <p class="desc">Mean PM2.5 AQI per calendar month in the selected range.</p>
+      <div class="chart sm"><canvas id="monthChart" role="img" aria-label="Bar chart of Bangkok monthly average PM2.5 AQI"></canvas></div>
+    </section>
+    <section class="card">
+      <h2>Bangkok days by AQI category</h2>
+      <p class="desc">US EPA categories for the PM2.5 sub-index.</p>
+      <div class="chart sm"><canvas id="catChart" role="img" aria-label="Bar chart of Bangkok days per AQI category"></canvas></div>
+    </section>
+  </div>
+
+  <details class="card">
+    <summary>Monthly averages as a table</summary>
+    <div class="tablewrap"><table id="table"><thead></thead><tbody></tbody></table></div>
+  </details>
+  <details class="card">
+    <summary>Daily readings as a table (selected range)</summary>
+    <div class="tablewrap daily"><table id="daily"><caption class="sr">Daily PM2.5 AQI readings per city</caption><thead></thead><tbody></tbody></table></div>
+  </details>
+
+  <section class="notes">
+    <h2>About the data</h2>
+    <ul>
+      <li>Values are the PM2.5 <strong>AQI sub-index</strong> (US EPA scale) reported by the AQICN station feed, not raw µg/m³.</li>
+      <li>Collection is scheduled daily; the job did not run from 15 Jan to 18 Feb 2026, so that stretch has no data.</li>
+      <li>Each point is a single snapshot taken once a day in the Bangkok morning, not a 24-hour mean.</li>
+      <li>Stations: <span id="stations"></span>.</li>
+    </ul>
+  </section>
+
+  <footer>
+    Built by Nusrat Begum · <a href="https://github.com/NusratBegum/Data-Science-Final-Project">Source on GitHub</a> · Data: <a href="https://aqicn.org/">World Air Quality Index Project</a>
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+(() => {
+  const CITIES = ['Bangkok', 'Beijing', 'Los Angeles'];
+  const CATS = [
+    { name: 'Good', max: 50 },
+    { name: 'Moderate', max: 100 },
+    { name: 'Unhealthy for sensitive', max: 150 },
+    { name: 'Unhealthy', max: 200 },
+    { name: 'Very unhealthy', max: 300 },
+    { name: 'Hazardous', max: Infinity },
+  ];
+  const fmtDate = (s) => new Date(s + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  const fmtMonth = (s) => new Date(s + '-01T00:00:00Z').toLocaleDateString('en-GB', { month: 'short', year: '2-digit', timeZone: 'UTC' });
+  const category = (v) => CATS.find((c) => v <= c.max).name;
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const mean = (a) => a.reduce((s, x) => s + x, 0) / a.length;
+
+  let data = null;
+  let rangeDays = 0;
+  const charts = {};
+
+  const addDays = (d, n) => {
+    const t = new Date(d + 'T00:00:00Z');
+    t.setUTCDate(t.getUTCDate() + n);
+    return t.toISOString().slice(0, 10);
+  };
+  function calendar(first, last) {
+    const out = [];
+    for (let d = first; d <= last; d = addDays(d, 1)) out.push(d);
+    return out;
+  }
+  const lastDate = () => data.series.Bangkok[data.series.Bangkok.length - 1][0];
+  // First calendar day of the selected range (inclusive).
+  const rangeStart = () => (rangeDays ? addDays(lastDate(), -(rangeDays - 1)) : data.series.Bangkok[0][0]);
+
+  function sliceSeries() {
+    const start = rangeStart();
+    const out = {};
+    for (const city of CITIES) {
+      out[city] = (data.series[city] || []).filter((r) => r[0] >= start);
+    }
+    return out;
+  }
+
+  // 7-calendar-day trailing mean over the full history; null when the window
+  // holds fewer than 4 readings, so collection gaps stay visible as breaks.
+  function rollingByDate(rows, days = 7, minReadings = 4) {
+    const byDate = new Map(rows.map((r) => [r[0], r[1]]));
+    const out = new Map();
+    for (const d of calendar(rows[0][0], rows[rows.length - 1][0])) {
+      const vals = [];
+      for (let i = 0; i < days; i++) {
+        const v = byDate.get(addDays(d, -i));
+        if (v != null) vals.push(v);
+      }
+      out.set(d, vals.length >= minReadings ? Math.round(mean(vals) * 10) / 10 : null);
+    }
+    return { byDate, avg: out };
+  }
+
+  function monthly(rows) {
+    const m = new Map();
+    for (const r of rows) {
+      const k = r[0].slice(0, 7);
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push(r[1]);
+    }
+    return [...m.entries()].map(([k, v]) => [k, Math.round(mean(v)), v.length]);
+  }
+
+  // Thin dashed reference lines at AQI 100 and 150.
+  const refLines = {
+    id: 'refLines',
+    afterDraw(chart) {
+      const y = chart.scales.y;
+      if (!y) return;
+      const { ctx, chartArea } = chart;
+      ctx.save();
+      ctx.strokeStyle = css('--ref');
+      ctx.fillStyle = css('--text-muted');
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1;
+      ctx.font = '11px system-ui, sans-serif';
+      for (const v of [100, 150]) {
+        if (v < y.min || v > y.max) continue;
+        const py = y.getPixelForValue(v);
+        ctx.beginPath(); ctx.moveTo(chartArea.left, py); ctx.lineTo(chartArea.right, py); ctx.stroke();
+        ctx.textAlign = 'right';
+        ctx.fillText(String(v), chartArea.right - 4, py - 4);
+      }
+      ctx.restore();
+    },
+  };
+
+  // Crosshair on the line chart.
+  const crosshair = {
+    id: 'crosshair',
+    afterDatasetsDraw(chart) {
+      const active = chart.tooltip && chart.tooltip.getActiveElements();
+      if (!active || !active.length) return;
+      const x = active[0].element.x;
+      const { ctx, chartArea } = chart;
+      ctx.save();
+      ctx.strokeStyle = css('--text-muted');
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, chartArea.top); ctx.lineTo(x, chartArea.bottom); ctx.stroke();
+      ctx.restore();
+    },
+  };
+
+  function baseOptions() {
+    const grid = css('--grid');
+    const muted = css('--text-muted');
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: css('--surface-1'),
+          titleColor: css('--text-primary'),
+          bodyColor: css('--text-secondary'),
+          borderColor: css('--border'),
+          borderWidth: 1,
+          padding: 10,
+          boxPadding: 4,
+          usePointStyle: true,
+        },
+      },
+      scales: {
+        x: { grid: { display: false }, border: { color: grid }, ticks: { color: muted, maxRotation: 0, autoSkipPadding: 16 } },
+        y: { beginAtZero: true, grid: { color: grid }, border: { display: false }, ticks: { color: muted, maxTicksLimit: 6 } },
+      },
+    };
+  }
+
+  function render() {
+    const sel = sliceSeries();
+    const bkk = sel.Bangkok;
+    const all = data.series.Bangkok;
+
+    // Tiles
+    const span = calendar(all[0][0], lastDate()).length;
+    document.getElementById('t-days').textContent = all.length.toLocaleString();
+    document.getElementById('t-days-sub').textContent = `since ${fmtDate(all[0][0])} · ${span - all.length} days missing`;
+    const last = all[all.length - 1];
+    document.getElementById('t-latest').textContent = last[1];
+    document.getElementById('t-latest-sub').textContent = `${category(last[1])} · ${fmtDate(last[0])}`;
+    document.getElementById('t-avg').textContent = Math.round(mean(bkk.map((r) => r[1])));
+    const over = bkk.filter((r) => r[1] > 100).length;
+    document.getElementById('t-over').textContent = over;
+    document.getElementById('t-over-sub').textContent = `${Math.round((over / bkk.length) * 100)}% of ${bkk.length} days`;
+
+    // Line chart
+    const labels = calendar(rangeStart(), lastDate());
+    const colors = { Bangkok: css('--series-1'), Beijing: css('--series-2'), 'Los Angeles': css('--series-3') };
+    const datasets = CITIES.map((city) => {
+      const { byDate, avg } = rollingByDate(data.series[city]);
+      const raw = labels.map((d) => byDate.get(d) ?? null);
+      return {
+        label: city,
+        data: labels.map((d) => avg.get(d) ?? null),
+        raw,
+        borderColor: colors[city],
+        backgroundColor: colors[city],
+        borderWidth: city === 'Bangkok' ? 2.5 : 2,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        pointHoverBorderColor: css('--surface-1'),
+        pointHoverBorderWidth: 2,
+        tension: 0.25,
+        spanGaps: false,
+      };
+    });
+    document.getElementById('legend').innerHTML = CITIES.map((c) => `<span><i style="background:${colors[c]}"></i>${c}</span>`).join('');
+
+    const lineOpts = baseOptions();
+    lineOpts.interaction = { mode: 'index', intersect: false };
+    lineOpts.scales.x.ticks.callback = function (v) {
+      const d = this.getLabelForValue(v);
+      return fmtMonth(d.slice(0, 7));
+    };
+    lineOpts.scales.x.ticks.maxTicksLimit = 8;
+    lineOpts.plugins.tooltip.callbacks = {
+      title: (items) => fmtDate(items[0].label),
+      label: (item) => {
+        const ds = item.dataset;
+        const daily = ds.raw[item.dataIndex];
+        const avg = item.raw == null ? '–' : item.raw;
+        return ` ${ds.label}: ${daily == null ? 'no reading' : daily} that day · 7-day avg ${avg}`;
+      },
+    };
+    charts.line && charts.line.destroy();
+    charts.line = new Chart(document.getElementById('lineChart'), {
+      type: 'line',
+      data: { labels, datasets },
+      options: lineOpts,
+      plugins: [refLines, crosshair],
+    });
+
+    // Monthly bars (Bangkok)
+    const months = monthly(bkk);
+    const monthOpts = baseOptions();
+    monthOpts.plugins.tooltip.callbacks = {
+      title: (items) => fmtMonth(months[items[0].dataIndex][0]),
+      label: (item) => ` Average ${item.raw} over ${months[item.dataIndex][2]} days`,
+    };
+    charts.month && charts.month.destroy();
+    charts.month = new Chart(document.getElementById('monthChart'), {
+      type: 'bar',
+      data: {
+        labels: months.map((m) => fmtMonth(m[0])),
+        datasets: [{ data: months.map((m) => m[1]), backgroundColor: colors.Bangkok, borderRadius: { topLeft: 4, topRight: 4 }, borderSkipped: 'bottom', maxBarThickness: 28, categoryPercentage: 0.85, barPercentage: 0.9 }],
+      },
+      options: monthOpts,
+      plugins: [refLines],
+    });
+
+    // Category bars (Bangkok), ordinal blue ramp light to dark
+    const counts = CATS.map((c) => bkk.filter((r) => category(r[1]) === c.name).length);
+    const ramp = ['--seq-1', '--seq-2', '--seq-3', '--seq-4', '--seq-5', '--seq-6'].map(css);
+    const catOpts = baseOptions();
+    catOpts.indexAxis = 'y';
+    catOpts.scales = {
+      x: { beginAtZero: true, grid: { color: css('--grid') }, border: { display: false }, ticks: { color: css('--text-muted'), maxTicksLimit: 5 } },
+      y: { grid: { display: false }, border: { color: css('--grid') }, ticks: { color: css('--text-secondary') } },
+    };
+    catOpts.plugins.tooltip.callbacks = {
+      label: (item) => ` ${item.raw} days (${Math.round((item.raw / bkk.length) * 100)}%)`,
+    };
+    charts.cat && charts.cat.destroy();
+    charts.cat = new Chart(document.getElementById('catChart'), {
+      type: 'bar',
+      data: {
+        labels: CATS.map((c) => c.name),
+        datasets: [{ data: counts, backgroundColor: ramp, borderRadius: { topRight: 4, bottomRight: 4 }, borderSkipped: 'left', maxBarThickness: 22 }],
+      },
+      options: catOpts,
+    });
+
+    // Table: monthly averages for all cities
+    const byCity = Object.fromEntries(CITIES.map((c) => [c, new Map(monthly(sel[c]).map((m) => [m[0], m[1]]))]));
+    document.querySelector('#table thead').innerHTML = `<tr><th>Month</th>${CITIES.map((c) => `<th>${c}</th>`).join('')}<th>Bangkok days</th></tr>`;
+    document.querySelector('#table tbody').innerHTML = months
+      .slice()
+      .reverse()
+      .map((m) => `<tr><td>${fmtMonth(m[0])}</td>${CITIES.map((c) => `<td>${byCity[c].get(m[0]) ?? '–'}</td>`).join('')}<td>${m[2]}</td></tr>`)
+      .join('');
+
+    const dailyBy = Object.fromEntries(CITIES.map((c) => [c, new Map(sel[c].map((r) => [r[0], r[1]]))]));
+    document.querySelector('#daily thead').innerHTML = `<tr><th>Date</th>${CITIES.map((c) => `<th>${c}</th>`).join('')}</tr>`;
+    document.querySelector('#daily tbody').innerHTML = bkk
+      .slice()
+      .reverse()
+      .map((r) => `<tr><td>${fmtDate(r[0])}</td>${CITIES.map((c) => `<td>${dailyBy[c].get(r[0]) ?? '–'}</td>`).join('')}</tr>`)
+      .join('');
+  }
+
+  document.getElementById('range').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    rangeDays = Number(btn.dataset.days);
+    for (const b of document.querySelectorAll('#range button')) b.setAttribute('aria-pressed', String(b === btn));
+    render();
+  });
+
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => data && render());
+
+  fetch('data.json', { cache: 'no-cache' })
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then((d) => {
+      data = d;
+      document.getElementById('meta').innerHTML =
+        `Updated ${d.generated.replace('T', ' ').replace('Z', ' UTC')} · ${CITIES.length} cities · <a href="data.json">raw data (JSON)</a>`;
+      document.getElementById('stations').textContent = CITIES.map((c) => `${c} (${d.stations[c] || 'n/a'})`).join(', ');
+      render();
+    })
+    .catch(() => {
+      document.getElementById('meta').textContent = 'Could not load data.json.';
+    });
+})();
+</script>
+</body>
+</html>
