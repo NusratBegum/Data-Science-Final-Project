@@ -51,11 +51,14 @@ jobs:
           echo "Data fetch completed"
           git status  # Show changes after script
 
+      - name: Rebuild dashboard data
+        run: python scripts/build_dashboard.py
+
       - name: Commit and push changes
         env:
           GH_PAT: ${{ secrets.GH_PAT }}  # Personal Access Token for authentication
         run: |
-          git add air_data.csv
+          git add air_data.csv dashboard/data.json
           if git diff-index --quiet HEAD; then
             echo "No changes detected, skipping commit."
           else
