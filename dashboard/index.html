@@ -98,6 +98,8 @@
   th, td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
   th:first-child, td:first-child { text-align: left; }
   th { color: var(--text-secondary); font-weight: 600; }
+  .tablewrap.daily { max-height: 420px; overflow-y: auto; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .notes { margin-top: 24px; font-size: 13px; color: var(--text-secondary); }
   .notes h2 { font-size: 15px; color: var(--text-primary); margin: 0 0 6px; }
   .notes ul { margin: 0; padding-left: 18px; }
@@ -115,7 +117,7 @@
 <div class="wrap">
   <header>
     <h1>Bangkok Air Quality Tracker</h1>
-    <p>PM2.5 readings for Bangkok, with Beijing and Los Angeles for comparison. A scheduled GitHub Actions job pulls one reading per city from the AQICN API every day and commits it to the repository; this page is rebuilt from that file.</p>
+    <p>PM2.5 readings for Bangkok, with Beijing and Los Angeles for comparison. A scheduled GitHub Actions job pulls one reading per city from the AQICN API each day and commits it to the repository; this page is rebuilt from that file.</p>
     <div class="meta" id="meta">Loading data…</div>
   </header>
 
@@ -137,7 +139,7 @@
 
   <section class="card">
     <h2>PM2.5 AQI by city, 7-day average</h2>
-    <p class="desc">Hover for the daily reading. Dashed lines mark AQI 100 (unhealthy for sensitive groups) and 150 (unhealthy).</p>
+    <p class="desc">Hover for the daily reading; breaks are days with no collection. Dashed lines mark AQI 100 (unhealthy for sensitive groups) and 150 (unhealthy).</p>
     <div class="legend" id="legend"></div>
     <div class="chart"><canvas id="lineChart" role="img" aria-label="Line chart of 7-day average PM2.5 AQI for Bangkok, Beijing and Los Angeles"></canvas></div>
   </section>
@@ -159,11 +161,16 @@
     <summary>Monthly averages as a table</summary>
     <div class="tablewrap"><table id="table"><thead></thead><tbody></tbody></table></div>
   </details>
+  <details class="card">
+    <summary>Daily readings as a table (selected range)</summary>
+    <div class="tablewrap daily"><table id="daily"><caption class="sr">Daily PM2.5 AQI readings per city</caption><thead></thead><tbody></tbody></table></div>
+  </details>
 
   <section class="notes">
     <h2>About the data</h2>
     <ul>
       <li>Values are the PM2.5 <strong>AQI sub-index</strong> (US EPA scale) reported by the AQICN station feed, not raw µg/m³.</li>
+      <li>Collection is scheduled daily; the job did not run from 15 Jan to 18 Feb 2026, so that stretch has no data.</li>
       <li>Each point is a single snapshot taken once a day in the Bangkok morning, not a 24-hour mean.</li>
       <li>Stations: <span id="stations"></span>.</li>
     </ul>
@@ -196,20 +203,43 @@
   let rangeDays = 0;
   const charts = {};
 
+  const addDays = (d, n) => {
+    const t = new Date(d + 'T00:00:00Z');
+    t.setUTCDate(t.getUTCDate() + n);
+    return t.toISOString().slice(0, 10);
+  };
+  function calendar(first, last) {
+    const out = [];
+    for (let d = first; d <= last; d = addDays(d, 1)) out.push(d);
+    return out;
+  }
+  const lastDate = () => data.series.Bangkok[data.series.Bangkok.length - 1][0];
+  // First calendar day of the selected range (inclusive).
+  const rangeStart = () => (rangeDays ? addDays(lastDate(), -(rangeDays - 1)) : data.series.Bangkok[0][0]);
+
   function sliceSeries() {
+    const start = rangeStart();
     const out = {};
     for (const city of CITIES) {
-      const rows = data.series[city] || [];
-      out[city] = rangeDays ? rows.slice(-rangeDays) : rows;
+      out[city] = (data.series[city] || []).filter((r) => r[0] >= start);
     }
     return out;
   }
 
-  function rolling(values, n) {
-    return values.map((_, i) => {
-      if (i < n - 1) return null;
-      return Math.round(mean(values.slice(i - n + 1, i + 1)) * 10) / 10;
-    });
+  // 7-calendar-day trailing mean over the full history; null when the window
+  // holds fewer than 4 readings, so collection gaps stay visible as breaks.
+  function rollingByDate(rows, days = 7, minReadings = 4) {
+    const byDate = new Map(rows.map((r) => [r[0], r[1]]));
+    const out = new Map();
+    for (const d of calendar(rows[0][0], rows[rows.length - 1][0])) {
+      const vals = [];
+      for (let i = 0; i < days; i++) {
+        const v = byDate.get(addDays(d, -i));
+        if (v != null) vals.push(v);
+      }
+      out.set(d, vals.length >= minReadings ? Math.round(mean(vals) * 10) / 10 : null);
+    }
+    return { byDate, avg: out };
   }
 
   function monthly(rows) {
@@ -295,8 +325,9 @@
     const all = data.series.Bangkok;
 
     // Tiles
+    const span = calendar(all[0][0], lastDate()).length;
     document.getElementById('t-days').textContent = all.length.toLocaleString();
-    document.getElementById('t-days-sub').textContent = `since ${fmtDate(all[0][0])}, per city`;
+    document.getElementById('t-days-sub').textContent = `since ${fmtDate(all[0][0])} · ${span - all.length} days missing`;
     const last = all[all.length - 1];
     document.getElementById('t-latest').textContent = last[1];
     document.getElementById('t-latest-sub').textContent = `${category(last[1])} · ${fmtDate(last[0])}`;
@@ -306,13 +337,14 @@
     document.getElementById('t-over-sub').textContent = `${Math.round((over / bkk.length) * 100)}% of ${bkk.length} days`;
 
     // Line chart
-    const labels = bkk.map((r) => r[0]);
+    const labels = calendar(rangeStart(), lastDate());
     const colors = { Bangkok: css('--series-1'), Beijing: css('--series-2'), 'Los Angeles': css('--series-3') };
     const datasets = CITIES.map((city) => {
-      const raw = sel[city].map((r) => r[1]);
+      const { byDate, avg } = rollingByDate(data.series[city]);
+      const raw = labels.map((d) => byDate.get(d) ?? null);
       return {
         label: city,
-        data: rolling(raw, 7),
+        data: labels.map((d) => avg.get(d) ?? null),
         raw,
         borderColor: colors[city],
         backgroundColor: colors[city],
@@ -322,7 +354,7 @@
         pointHoverBorderColor: css('--surface-1'),
         pointHoverBorderWidth: 2,
         tension: 0.25,
-        spanGaps: true,
+        spanGaps: false,
       };
     });
     document.getElementById('legend').innerHTML = CITIES.map((c) => `<span><i style="background:${colors[c]}"></i>${c}</span>`).join('');
@@ -340,7 +372,7 @@
         const ds = item.dataset;
         const daily = ds.raw[item.dataIndex];
         const avg = item.raw == null ? '–' : item.raw;
-        return ` ${ds.label}: ${daily} that day · 7-day avg ${avg}`;
+        return ` ${ds.label}: ${daily == null ? 'no reading' : daily} that day · 7-day avg ${avg}`;
       },
     };
     charts.line && charts.line.destroy();
@@ -398,6 +430,14 @@
       .slice()
       .reverse()
       .map((m) => `<tr><td>${fmtMonth(m[0])}</td>${CITIES.map((c) => `<td>${byCity[c].get(m[0]) ?? '–'}</td>`).join('')}<td>${m[2]}</td></tr>`)
+      .join('');
+
+    const dailyBy = Object.fromEntries(CITIES.map((c) => [c, new Map(sel[c].map((r) => [r[0], r[1]]))]));
+    document.querySelector('#daily thead').innerHTML = `<tr><th>Date</th>${CITIES.map((c) => `<th>${c}</th>`).join('')}</tr>`;
+    document.querySelector('#daily tbody').innerHTML = bkk
+      .slice()
+      .reverse()
+      .map((r) => `<tr><td>${fmtDate(r[0])}</td>${CITIES.map((c) => `<td>${dailyBy[c].get(r[0]) ?? '–'}</td>`).join('')}</tr>`)
       .join('');
   }
 
