@@ -1,6 +1,6 @@
 # Bangkok Air Quality Tracker
 
-**Live dashboard:** _link added after the first Vercel deploy_
+**Live dashboard:** https://bangkok-air-quality.vercel.app
 
 A small data pipeline and dashboard for PM2.5 in Bangkok, with Beijing and Los Angeles for comparison. A scheduled GitHub Actions job has pulled one reading per city from the AQICN API each day since **1 March 2025** and committed it to this repository: 570 daily readings per city so far, with one 35-day gap (15 Jan – 18 Feb 2026) when the job did not run. A static dashboard is rebuilt from that file and deployed on every push.
 
